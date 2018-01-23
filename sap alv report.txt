@@ -1,0 +1,519 @@
+*&---------------------------------------------------------------------*
+*& Report  ZACD
+*&
+*&---------------------------------------------------------------------*
+*&
+*&
+*&---------------------------------------------------------------------*
+
+REPORT  ZACD.
+*&'~'~'~'~'~'~'~'~'~'~'~'~'~'~'~'~'~'~'~'~'~'~'~'~'~'~'~'~'~'~'~'~'~'~*&
+*&--------------------------------------------------------------------*&
+*&  Program Name       : ZBUTTONS1                                    *&
+*&  Transaction Code   :                                   *&
+*&  Module             :                                              *&
+*&  Package            :                                        *&
+*&  Developer          : AnSHUL GAIROLA                               *&
+*&  Program Type       : 1 - Executable                               *&
+*&--------------------------------------------------------------------*&
+* Original program ZNEWREPORT
+* Basically this program is a display for QALS ,REFRENCE DATE, and for multiple batches .
+*&'~'~'~'~'~'~'~'~'~'~'~'~'~'~'~'~'~'~'~'~'~'~'~'~'~'~'~'~'~'~'~'~'~'~*&
+
+
+
+
+*****************************************tables***********************************************************************************************
+TABLES : QALS,
+         MAKT,
+         QAVE,
+         ZCDLCERT.
+
+*********************************************QALS*********************************************************************************************
+TYPES : BEGIN OF GS_QALS,
+          MATNR     LIKE QALS-MATNR    ,    " item
+          WERK      LIKE QALS-WERK     ,     " plant
+          CHARG     LIKE QALS-CHARG    ,    " batch
+          PRUEFLOS  LIKE QALS-PRUEFLOS ,
+          "sCHARG LIKE QALS-sCHARG,
+
+           cdl1_date type DATS          ,
+           cdl2_date type DATS          ,
+           days_cdl1 TYPE INT1          ,
+           days_cdl2 TYPE INT1          ,
+             STATUS(150),                    "text status
+           icon TYPE c,  
+  END OF GS_QALS.
+
+
+
+DATA : IT_QALS  TYPE STANDARD TABLE OF GS_QALS,
+     WA_QALS  TYPE GS_QALS.
+
+**********************************************************************************************************************************************
+
+DATA: SORT TYPE SLIS_T_SORTINFO_ALV WITH HEADER LINE.
+CLEAR SORT[].
+
+TYPES : BEGIN OF GS_FINAL,
+          ICON TYPE C,
+          WERK       LIKE QALS-WERK,              " plant
+          CHARG      LIKE QALS-CHARG,             " batch
+          PRUEFLOS   LIKE QALS-PRUEFLOS,          " il no
+          MATNR      LIKE QALS-MATNR,             "MATERIAL NO.
+          vcode      LIKE QAVE-vcode,             "vcode
+          REF_DATE   LIKE ZCDLCERT-REF_DATE,      "reference date
+          relcertdate LIKE ZCDLCERT-relcertdate,  "certificate recieve date.
+          VAEDATUM   LIKE  QAVE-VAEDATUM,         "verification date.
+          MAKTX      LIKE  MAKT-MAKTX,
+          UCHARG     LIKE ZCDLCERT-UCHARG,        "scharg for batch inzcdlcert
+
+ END OF GS_FINAL.
+
+
+
+
+
+
+DATA : IT_FINAL TYPE STANDARD TABLE OF GS_FINAL INITIAL SIZE 1000,
+       WA_FINAL TYPE GS_FINAL.
+
+
+***********************************************QAVE*******************************************************************************************
+TYPES : BEGIN OF GS_QAVE,
+        vcode LIKE QAVE-vcode   ,
+        PRUEFLOS  LIKE QAVE-PRUEFLOS ,
+        VAEDATUM LIKE QAVE-VAEDATUM,
+        END OF GS_QAVE.
+
+DATA : IT_QAVE  TYPE STANDARD TABLE OF GS_QAVE,
+
+     WA_QAVE  TYPE GS_QAVE.
+
+**********************************************************************************************************************************************
+
+**********************************************ZCDLCERT****************************************************************************************
+
+TYPES : BEGIN OF GS_ZCDLCERT,
+       "CHARG LIKE GS_ZCDLCERT-CHARG,
+        relcertdate LIKE ZCDLCERT-relcertdate,
+        ref_date LIKE ZCDLCERT-ref_date   ,
+        UCHARG LIKE ZCDLCERT-UCHARG,
+
+        END OF GS_ZCDLCERT.
+
+DATA : IT_ZCDLCERT  TYPE STANDARD TABLE OF GS_ZCDLCERT,
+       WA_ZCDLCERT  TYPE GS_ZCDLCERT.
+**********************************************************************************************************************************************
+
+*************************************************MAKT*****************************************************************************************
+*
+TYPES : BEGIN OF GS_MAKT,
+        maktx LIKE MAKT-maktx   ,
+        MATNR LIKE MAKT-MATNR   ,
+        END OF GS_MAKT.
+
+DATA : IT_MAKT  TYPE STANDARD TABLE OF GS_MAKT,
+
+      WA_MAKT  TYPE GS_MAKT.
+DATA : PLINE  LIKE BSVX-STTXT.
+DATA: COUNT  TYPE I.
+
+**********************************************************************************************************************************************
+
+*****
+***************************************************SELECTION SCREEN************************************************************************************************************************
+
+SELECTION-SCREEN BEGIN OF BLOCK BLK1 WITH FRAME TITLE TEXT-111..
+PARAMETERS : MATN TYPE MARA-MATNR .
+PARAMETERS : S_DAYS TYPE I OBLIGATORY DEFAULT 180 .
+SELECTION-SCREEN END OF BLOCK BLK1.
+SELECTION-SCREEN SKIP.
+
+
+********SELECTION SCREEN FOR CHECKBOX 2 *********
+SELECTION-SCREEN BEGIN OF BLOCK BLK2 WITH FRAME TITLE TEXT-111.
+
+SELECTION-SCREEN BEGIN OF LINE.
+PARAMETERS : EMAIL AS CHECKBOX.
+SELECTION-SCREEN COMMENT 3(10) TEXT-141.
+SELECTION-SCREEN POSITION 3.
+SELECTION-SCREEN: COMMENT 35(10) TEXT-151.
+Parameters : p_email like adr6-SMTP_ADDR.
+SELECTION-SCREEN END OF LINE.
+SELECTION-SCREEN END OF BLOCK BLK2.
+SELECTION-SCREEN SKIP.
+
+
+********SELECTION SCREEN FOR CHECKBOX BLOCK 3 *********
+SELECTION-SCREEN BEGIN OF BLOCK BLK3 WITH FRAME TITLE TEXT-161.
+SELECTION-SCREEN BEGIN OF LINE.
+PARAMETERS : DESC AS CHECKBOX.
+SELECTION-SCREEN POSITION 3.
+SELECTION-SCREEN COMMENT 3(10) TEXT-171.
+
+SELECTION-SCREEN POSITION 70.
+SELECTION-SCREEN: COMMENT 35(10) TEXT-181.
+PARAMETERS : PEND AS CHECKBOX.
+SELECTION-SCREEN END OF LINE.
+SELECTION-SCREEN END OF BLOCK BLK3.
+
+**********************************************************************************************************************************************
+****** BUTTONS FOR AUTO-EMAILING.
+**
+IF p_email = 'Y'.
+ENDIF.
+
+
+IF EMAIL = 'X'.
+
+ENDIF.
+"IF DESC = 'X'.
+
+
+IF PEND = 'X'.
+
+ENDIF.
+
+**********************************************************************************************************************************************
+
+
+
+*****************************************START OF SELECTION*****************************************************************************
+****SELECTION PROCESSES
+START-OF-SELECTION.
+  PERFORM ADD_DATA.
+  PERFORM BUILD_CATALOG.
+  PERFORM ALV_DISPLAY.
+
+
+END-OF-SELECTION.
+**********************************************************************************************************************************************
+
+
+*****************************************ADD DATA**************************************************************************************************
+FORM ADD_DATA.
+
+  SELECT *
+    INTO CORRESPONDING FIELDS OF TABLE IT_QAVE
+    FROM QAVE
+    WHERE vcode = 'CDL1'  and
+          VAEDATUM > '20120101' .
+
+***QALS***
+  IF IT_QAVE[] IS NOT INITIAL.
+***  GET DATA
+    SELECT *
+      INTO CORRESPONDING FIELDS OF TABLE IT_QALS
+      FROM QALS
+     FOR ALL ENTRIES IN IT_QAVE
+      WHERE PRUEFLOS = IT_QAVE-PRUEFLOS .
+
+  ENDIF.
+
+
+
+***ZCDLCERT***
+  IF IT_QALS[] IS NOT INITIAL.
+***  GET DATA
+    SELECT *
+      INTO CORRESPONDING FIELDS OF TABLE IT_ZCDLCERT
+      FROM ZCDLCERT
+      FOR ALL ENTRIES IN IT_QALS
+            WHERE UCHARG = IT_QALS-CHARG .
+
+  ENDIF.
+
+
+
+
+******MAKT*****
+  IF IT_QALS[] IS NOT INITIAL.
+***  GET DATA
+    SELECT *
+      INTO CORRESPONDING FIELDS OF TABLE IT_MAKT
+      FROM MAKT
+      FOR ALL ENTRIES IN IT_QALS
+      WHERE MATNR = IT_QALS-MATNR.
+
+  ENDIF.
+
+
+*********************************JOIN ALL THE TABLES TO CREATE FINAL TABLE *******************************************************************
+****ADD JOINS OF ABOVE 4 TABLES TO NEW FINAL TABLE
+  LOOP AT IT_QALS INTO WA_QALS.
+    WA_FINAL-WERK = WA_QALS-WERK.  " plant
+    WA_FINAL-CHARG = WA_QALS-CHARG.  " batch
+    WA_FINAL-PRUEFLOS = WA_QALS-PRUEFLOS.  " il no
+    WA_FINAL-MATNR = WA_QALS-MATNR.     "MATERIAL
+
+
+
+    LOOP AT IT_MAKT INTO WA_MAKT WHERE MATNR = wa_QALS-MATNR.
+      WA_FINAL-maktx = WA_MAKT-maktx.
+    ENDLOOP.
+
+
+
+    LOOP AT IT_QAVE INTO WA_QAVE WHERE PRUEFLOS = wa_QALS-PRUEFLOS.
+      WA_FINAL-VCODE = WA_QAVE-VCODE.
+      WA_FINAL-VAEDATUM   = WA_QAVE-VAEDATUM.
+
+    ENDLOOP.
+
+    LOOP AT IT_ZCDLCERT INTO WA_ZCDLCERT  WHERE uCHARG = wa_QALS-CHARG.                            "
+      WA_FINAL-REF_DATE = WA_ZCDLCERT-REF_DATE.                      "
+      WA_FINAL-relcertdate = wa_ZCDLCERT-relcertdate.
+      WA_FINAL-uCHARG = wa_ZCDLCERT-uCHARG.                           "
+
+
+    ENDLOOP.
+
+
+
+    APPEND  WA_FINAL TO IT_FINAL.
+
+ENDLOOP.
+LOOP AT it_FINAL INTO wa_FINAL.
+    IF wa_FINAL-relcertdate  IS INITIAL.
+      wa_FINAL-icon = 3.
+
+    ELSE.
+      wa_FINAL-icon = 1.  " Green Traffic Light
+    ENDIF.
+    MODIFY it_FINAL FROM wa_FINAL TRANSPORTING icon.
+    CLEAR: wa_FINAL.
+
+  ENDLOOP.
+endform.
+**********************************************************************************************************************************************
+
+
+************************************************ALV DECLARE***********************************************************************************
+** DECLARATION
+TYPE-POOLS : SLIS.
+
+DATA: FIELDCAT TYPE SLIS_T_FIELDCAT_ALV WITH HEADER LINE,
+      LAYOUT   TYPE SLIS_LAYOUT_ALV,
+      W_EVENT  TYPE SLIS_ALV_EVENT,
+      T_EVENT  TYPE SLIS_T_EVENT,
+      IT_TOP   TYPE SLIS_LISTHEADER OCCURS 0 WITH HEADER LINE.
+"DATA: SORT TYPE SLIS_T_SORTINFO_ALV WITH HEADER LINE.
+"CLEAR SORT[].
+
+DATA : HEADING TYPE SLIS_T_LISTHEADER WITH HEADER LINE.
+
+DATA : I_EVENTS TYPE SLIS_T_EVENT,
+       FORMNAME_TOP_OF_PAGE TYPE SLIS_FORMNAME VALUE 'TOP_OF_PAGE'.
+DATA: L_I_EVENT TYPE SLIS_ALV_EVENT.
+
+
+*****************************TDLINE*****************************************************************************************************************
+DATA : BEGIN OF STXH_TAB OCCURS 0,
+TDOBJECT LIKE STXH-TDOBJECT,
+TDNAME LIKE STXH-TDNAME,
+TDID LIKE STXH-TDID,
+TDSPRAS LIKE STXH-TDSPRAS,
+TDLINE(200),
+TDLINE1(200),
+TDLINE2(200),
+TDLINE3(200),
+END OF STXH_TAB.
+
+
+"TLINE--------------------
+DATA : BEGIN OF LINES OCCURS 0,
+TDFORMAT LIKE TLINE-TDFORMAT,
+TDLINE(200),
+END OF LINES.
+
+**********************************************************************************************************************************************
+
+
+
+*************************************************BUILD CATALOG**********************************************************************************************************************************************
+*--------------------------------------------------------------------*
+*&      Form  BUILD_CATALOG
+*&---------------------------------------------------------------------*
+FORM BUILD_CATALOG .
+
+
+
+
+  DATA COUNT TYPE I. CLEAR COUNT             .
+
+  ADD 1 TO COUNT                             .
+  FIELDCAT-COL_POS   = COUNT                 .
+  FIELDCAT-FIELDNAME = 'PRUEFLOS'            .
+  FIELDCAT-SELTEXT_L = 'IL.NO.'              .
+  FIELDCAT-OUTPUTLEN = 12                    .
+  APPEND FIELDCAT.  CLEAR FIELDCAT           .
+
+  ADD 1 TO COUNT                             .
+  FIELDCAT-COL_POS   = COUNT                 .
+  FIELDCAT-FIELDNAME = 'CHARG'               .
+  FIELDCAT-SELTEXT_L = 'CHARGE'              .
+  FIELDCAT-OUTPUTLEN = 20                    .
+  APPEND FIELDCAT.  CLEAR FIELDCAT           .
+
+  ADD 1 TO COUNT                             .
+  FIELDCAT-COL_POS   = COUNT                 .
+  FIELDCAT-FIELDNAME = 'WERK'                .
+  FIELDCAT-SELTEXT_L = 'WERK NO'             .
+  FIELDCAT-OUTPUTLEN = 10                    .
+  APPEND FIELDCAT.  CLEAR FIELDCAT           .
+
+  ADD 1 TO COUNT                             .
+  FIELDCAT-COL_POS   = COUNT                 .
+  FIELDCAT-FIELDNAME = 'MAKTX'               .
+  FIELDCAT-SELTEXT_L = 'MATERIAL DESC.'      .
+  FIELDCAT-OUTPUTLEN = 40.                   .
+  APPEND FIELDCAT.  CLEAR FIELDCAT           .
+
+  ADD 1 TO COUNT                             .
+  FIELDCAT-COL_POS   = COUNT                 .
+  FIELDCAT-FIELDNAME = 'MATNR'               .
+  FIELDCAT-SELTEXT_L = 'MATERIAL'            .
+  FIELDCAT-OUTPUTLEN = 14.                   .
+  APPEND FIELDCAT.  CLEAR FIELDCAT           .
+
+  ADD 1 TO COUNT                             .
+  FIELDCAT-COL_POS   = COUNT                 .
+  FIELDCAT-FIELDNAME = 'VCODE'               .
+  FIELDCAT-SELTEXT_L = 'VCODE'               .
+  FIELDCAT-OUTPUTLEN = 10.                   .
+  APPEND FIELDCAT.  CLEAR FIELDCAT           .
+
+
+  ADD 1 TO COUNT                             .
+  FIELDCAT-COL_POS   = COUNT                 .
+  FIELDCAT-FIELDNAME = 'RELCERTDATE'         .
+  FIELDCAT-SELTEXT_L = 'REAL CERT. DATE'     .
+  FIELDCAT-OUTPUTLEN = 8.                    .
+  APPEND FIELDCAT.  CLEAR FIELDCAT           .
+
+
+  ADD 1 TO COUNT                             .
+  FIELDCAT-COL_POS   = COUNT                 .
+  FIELDCAT-FIELDNAME = 'REF_DATE'            .
+  FIELDCAT-SELTEXT_L = 'REFRENCE DATE'       .
+  FIELDCAT-OUTPUTLEN = 10.                   .
+  APPEND FIELDCAT.  CLEAR FIELDCAT           .
+
+  ADD 1 TO COUNT                             .
+  FIELDCAT-COL_POS   = COUNT                 .
+  FIELDCAT-FIELDNAME = 'VAEDATUM'            .
+  FIELDCAT-SELTEXT_L = 'Verification Date'   .
+  FIELDCAT-OUTPUTLEN = 8                     .
+  APPEND FIELDCAT.  CLEAR FIELDCAT           .
+
+
+ENDFORM.
+**********************************************************************************************************************************************
+
+
+********************************************alv display***************************************************************************************
+FORM ALV_DISPLAY .
+  CALL FUNCTION 'REUSE_ALV_EVENTS_GET'
+    EXPORTING
+      I_LIST_TYPE = 0
+    IMPORTING
+      ET_EVENTS   = I_EVENTS.
+
+  READ TABLE I_EVENTS WITH KEY NAME = SLIS_EV_TOP_OF_PAGE
+                             INTO L_I_EVENT.
+
+  IF SY-SUBRC = 0.
+    MOVE FORMNAME_TOP_OF_PAGE TO L_I_EVENT-FORM.
+    APPEND L_I_EVENT TO I_EVENTS.
+
+      layout-lights_fieldname = 'ICON'.
+  ENDIF.
+
+
+**********************************************************************************************************************************************
+
+*********************************************DESCENDING ORDER  BUTTON****************************************************************************************************
+  IF DESC = 'X'.  "decending order button
+***  GET DATA
+    SORT IT_FINAL by VAEDATUM DESCENDING.
+
+    MESSAGE 'DESCENDING ORDER' type 'I'.
+  ENDIF.
+
+**********************************************************************************************************************************************
+
+
+
+******************* *****************************PENDING DATE *************************************************************************************************************
+  IF PEND = 'X'.
+    delete it_final where RELCERTDATE is initial.
+    MESSAGE 'PENDING DAYS' TYPE 'I'.
+  ENDIF.
+**********************************************************************************************************************************************
+
+*********************************************  HEADING TABLE FOR ALV******************************************************************************
+
+  PERFORM FILL_HEADINGTABLE TABLES HEADING USING 'HEADING'.
+  DATA VARIANT  LIKE  DISVARIANT. CLEAR VARIANT.
+  VARIANT-REPORT    = SY-REPID.
+
+  CALL FUNCTION 'REUSE_ALV_GRID_DISPLAY'
+    EXPORTING
+      I_CALLBACK_PROGRAM = SY-REPID
+      IS_LAYOUT          = LAYOUT
+      IT_FIELDCAT        = FIELDCAT[]
+      IT_SORT            = SORT[]
+      I_SAVE             = 'A'
+      IT_EVENTS          = I_EVENTS
+    TABLES
+      T_OUTTAB           = IT_FINAL.
+
+ENDFORM.                    " ALV_DISPLAY
+
+
+**********************************************************************************************************************************************
+
+***********************************************STRUCTURE OF FILL ITEM DATA***************************************************************************************
+
+FORM FILL_HEADINGTABLE  TABLES P_HEADING STRUCTURE HEADING USING TABLENAME.
+
+  DATA ITEM LIKE MARA-MATNR. CLEAR ITEM.
+  DATA NAME  LIKE MAKT-MAKTX. CLEAR NAME.
+  DATA ZSTRR TYPE STRING.
+
+  CASE TABLENAME.
+    WHEN 'HEADING'.
+
+      P_HEADING-TYP = 'S'.
+      P_HEADING-INFO = 'SERUM INSTITUTE OF INDIA LTD.'.
+      APPEND P_HEADING.
+      CLEAR ZSTRR.
+
+      ITEM =  MATN.
+      SELECT SINGLE MAKTX FROM MAKT INTO NAME WHERE MATNR = ITEM.
+      CONCATENATE 'ITEM CODE :' ITEM    'NAME :'  NAME   INTO P_HEADING-INFO
+                  SEPARATED BY SPACE.
+      APPEND P_HEADING.
+  ENDCASE.
+ENDFORM.
+
+**********************************************************************************************************************************************
+
+*&---------------------------------------------------------------------*
+*&      Form  TOP_OF_PAGE
+*&---------------------------------------------------------------------*
+FORM TOP_OF_PAGE.
+  CALL FUNCTION 'REUSE_ALV_COMMENTARY_WRITE'
+    EXPORTING
+      IT_LIST_COMMENTARY = HEADING[]
+    EXCEPTIONS
+      OTHERS             = 1.
+ENDFORM.                    "TOP_OF_PAGE
+
+
+
+
+************************************************************************************************************************************************************************************************************************************************************
+***************************************                END REPORT                    ***************************************************************************************
+**********************************************************************************************************************************************
